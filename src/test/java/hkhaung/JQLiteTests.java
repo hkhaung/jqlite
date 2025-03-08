@@ -49,5 +49,11 @@ public class JQLiteTests {
         Main.main(new String[]{DBFILE, "SELECT COUNT(*) FROM apples"});
         String expectedOutput = "4" + System.lineSeparator();
         assertEquals(expectedOutput, outputStream.toString());
+
+        outputStream.reset();
+
+        Main.main(new String[]{DBFILE, "SELECT COUNT(*) FROM oranges"});
+        expectedOutput = "6" + System.lineSeparator();
+        assertEquals(expectedOutput, outputStream.toString());
     }
 }

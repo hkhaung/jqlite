@@ -20,8 +20,8 @@ public class Utils {
 
     /* Given a file (.db) in bytes, returns the cell pointer array from
     * sqlite_schema page  */
-    public static List<Integer> getCellPointerArrSqliteSchema(byte[] fileBytes) {
-        int cellPointerArrIndex = 108;
+    public static List<Integer> getCellPointerArrSqliteSchema(byte[] fileBytes, int cellPointerArrIndex) {
+        cellPointerArrIndex += 8;  // skip the b-tree page header
         List<Integer> cellPointerArr = new ArrayList<>();
         for (int i = cellPointerArrIndex; i < fileBytes.length - 1; i += 2) {
             if (fileBytes[i] == 0 && fileBytes[i + 1] == 0) {
@@ -78,5 +78,12 @@ public class Utils {
                 command.startsWith("UPDATE") || command.startsWith("DELETE") ||
                 command.startsWith("CREATE") || command.startsWith("DROP") ||
                 command.startsWith("ALTER");
+    }
+
+    /* calculate page offset given pageNum
+    * pageNum is rootpage */
+    public static int determinePageOffset(int pageNum) {
+        int pageSize = 4096;
+        return (pageNum - 1) * pageSize;
     }
 }

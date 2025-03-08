@@ -24,7 +24,7 @@ public class Handlers {
         if (fileBytes == null) {
             return;
         }
-        List<Integer> cellPointerArr = Utils.getCellPointerArrSqliteSchema(fileBytes);
+        List<Integer> cellPointerArr = Utils.getCellPointerArrSqliteSchema(fileBytes, 100);  // 100 because we are on page 1 and we skip database header
 
         int pageSize = Utils.convertByteToInt(new byte[]{fileBytes[16], fileBytes[17]});
         System.out.println("database page size: " + pageSize);
@@ -42,7 +42,7 @@ public class Handlers {
         if (fileBytes == null) {
             return;
         }
-        List<Integer> cellPointerArr = Utils.getCellPointerArrSqliteSchema(fileBytes);
+        List<Integer> cellPointerArr = Utils.getCellPointerArrSqliteSchema(fileBytes, 100);  // 100 because we are on page 1 and we skip database header
 
         StringBuilder tableNames = new StringBuilder();
         for (int offset : cellPointerArr) {
@@ -52,6 +52,7 @@ public class Handlers {
             int recordHeaderSize = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
             int recordContentIndex = offset + recordHeaderSize - 1;
             byte[] serialTypes = Arrays.copyOfRange(fileBytes, offset, recordContentIndex);
+
             List<Integer> varints = VarintDecoder.decodeAllVarints(serialTypes);
             String prev = null;
             for (int varint : varints) {
@@ -68,5 +69,50 @@ public class Handlers {
         }
 
         System.out.println(tableNames.toString().trim());
+    }
+
+    // TODO: is hardcoded
+    public static int queryHandler(String databaseFilePath, String queryTable) {
+        byte[] fileBytes = readDbFile(databaseFilePath);
+        if (fileBytes == null) {
+            return -1;
+        }
+        List<Integer> cellPointerArr = Utils.getCellPointerArrSqliteSchema(fileBytes, 100);  // 100 because we are on page 1 and we skip database header
+
+        int rootPage = -1;
+        for (int offset : cellPointerArr) {
+            int recordSize = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
+            int rowId = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
+
+            int recordHeaderSize = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
+            int recordContentIndex = offset + recordHeaderSize - 1;
+            byte[] serialTypes = Arrays.copyOfRange(fileBytes, offset, recordContentIndex);
+
+            List<Integer> varints = VarintDecoder.decodeAllVarints(serialTypes);
+            String prev = null;
+            boolean twoQueryTablesFound = false;
+            for (int varint : varints) {
+                int contentSize = Utils.getContentSizeBySerialType(varint);
+                byte[] contentBytes = Arrays.copyOfRange(fileBytes, recordContentIndex, recordContentIndex + contentSize);
+                recordContentIndex += contentSize;
+                String content = Utils.interpretAsString(contentBytes);
+
+                if (Objects.equals(prev, queryTable) && Objects.equals(content, queryTable)) {
+                    twoQueryTablesFound = true;  // Found two consecutive queryTable occurrences
+                    continue;
+                }
+
+                if (twoQueryTablesFound) {
+                    rootPage = Utils.convertByteToInt(contentBytes);
+                    twoQueryTablesFound = false;
+                }
+
+                prev = content;
+            }
+        }
+
+        int pageOffset = Utils.determinePageOffset(rootPage);
+        return Utils.getCellPointerArrSqliteSchema(fileBytes, pageOffset).size();
+
     }
 }
