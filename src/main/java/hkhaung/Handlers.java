@@ -3,10 +3,10 @@ package hkhaung;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.sql.SQLOutput;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+
 
 public class Handlers {
 
@@ -53,12 +53,6 @@ public class Handlers {
             int recordContentIndex = offset + recordHeaderSize - 1;
             byte[] serialTypes = Arrays.copyOfRange(fileBytes, offset, recordContentIndex);
             List<Integer> varints = VarintDecoder.decodeAllVarints(serialTypes);
-
-//          System.out.println(Arrays.toString(serialTypes));
-//          for (int t : varints) {
-//            System.out.print(t);
-//            System.out.print(", ");
-//          }
             String prev = null;
             for (int varint : varints) {
                 int contentSize = Utils.getContentSizeBySerialType(varint);

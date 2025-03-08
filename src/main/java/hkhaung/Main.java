@@ -1,10 +1,5 @@
 package hkhaung;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+
 
 public class Main {
   public static void main(String[] args) {
@@ -15,9 +10,6 @@ public class Main {
 
     String databaseFilePath = args[0];
     String command = args[1];
-
-//    String databaseFilePath = "sample.db";
-//    String command = ".tables";
 
     // dot commands
     switch (command) {

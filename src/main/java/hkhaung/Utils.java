@@ -55,7 +55,7 @@ public class Utils {
     public static String interpretAsString(byte[] bytes) {
         try {
             String decodedString = new String(bytes, StandardCharsets.US_ASCII);
-            if (decodedString.matches("[\\x20-\\x7E]+")) {
+            if (decodedString.matches("[\\x00-\\x7E]+")) {
                 return decodedString;
             } else {
                 return null;
