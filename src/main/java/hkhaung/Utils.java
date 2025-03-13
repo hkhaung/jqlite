@@ -1,18 +1,102 @@
 package hkhaung;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 public class Utils {
-    public static byte[] readDbFile(String databaseFilePath) throws IOException {
+    static final byte interiorIndexPage = 0x02;
+    static final byte interiorTablePage = 0x05;
+    static final byte leafIndexPage = 0x0a;
+    static final byte leafTablePage = 0x0d;
+
+    public static RandomAccessFile readDbFile(String databaseFilePath) throws IOException {
         try {
-            return Files.readAllBytes(Paths.get(databaseFilePath));
+            return new RandomAccessFile(databaseFilePath, "r");
         } catch (IOException e) {
             throw new IOException("Error reading file: " + e.getMessage());
+        }
+    }
+
+    /* Read page size from .db file. The page size is the 16th and 17th byte of the .db file. */
+    public static int readPageSize(RandomAccessFile dbFile) throws IOException {
+        dbFile.seek(16);
+        return Short.toUnsignedInt(dbFile.readShort());
+    }
+
+    public static int getNumTables(RandomAccessFile dbFile, int pageSize, int pageNum) throws IOException {
+        int start = (pageNum - 1) * pageSize;
+        dbFile.seek(start);
+        if (pageNum == 1) {
+            dbFile.skipBytes(100);  // skip database header
+        }
+
+        // read b tree page header (8 bytes)
+        byte bTreePageType = dbFile.readByte();
+        dbFile.skipBytes(2);
+        int numCells = Short.toUnsignedInt(dbFile.readShort());
+        dbFile.skipBytes(3);
+
+        if (bTreePageType == interiorTablePage) {
+            // TODO
+        } else if (bTreePageType == leafTablePage) {
+            return numCells;
+        }
+    }
+
+    public static String getTableNames(RandomAccessFile dbFile, int pageSize, int pageNum) throws IOException {
+        // get all cells by looking at cell pointer arr of sqlite_schema page
+        // read each cell
+        int start = (pageNum - 1) * pageSize;
+        dbFile.seek(start);
+        if (pageNum == 1) {
+            dbFile.skipBytes(100);  // skip database header
+        }
+
+        // read b tree page header (8 bytes)
+        byte bTreePageType = dbFile.readByte();
+        dbFile.skipBytes(2);
+        int numCells = Short.toUnsignedInt(dbFile.readShort());
+        dbFile.skipBytes(3);
+
+        if (bTreePageType == interiorTablePage) {
+            // TODO
+        } else if (bTreePageType == leafTablePage) {
+            short[] cellPointerArr = new short[numCells];
+            for (int i = 0; i < numCells; i++) {
+                cellPointerArr[i] = dbFile.readShort();
+            }
+
+            StringBuilder tableNames = new StringBuilder();
+            for (short offset : cellPointerArr) {
+                dbFile.seek(start + offset);
+
+                int recordSize = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
+                int rowId = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
+
+//                int recordHeaderSize = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
+//                int recordContentIndex = offset + recordHeaderSize - 1;
+//                byte[] serialTypes = Arrays.copyOfRange(fileBytes, offset, recordContentIndex);
+//
+//                List<Integer> varints = VarintDecoder.decodeAllVarints(serialTypes);
+//                String prev = null;
+//                for (int varint : varints) {
+//                    int contentSize = Utils.getContentSizeBySerialType(varint);
+//                    byte[] contentBytes = Arrays.copyOfRange(fileBytes, recordContentIndex, recordContentIndex + contentSize);
+//                    recordContentIndex += contentSize;
+//                    String content = Utils.interpretAsString(contentBytes);
+//                    if (Objects.equals(prev, "table") && !Objects.equals(content, "sqlite_sequence") && content != null) {
+//                        tableNames.append(content);
+//                        tableNames.append(" ");
+//                    }
+//                    prev = content;
+//                }
+            }
+            return tableNames.toString().trim();
         }
     }
 

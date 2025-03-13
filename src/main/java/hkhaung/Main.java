@@ -2,6 +2,7 @@ package hkhaung;
 
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 
 
 public class Main {
@@ -18,23 +19,23 @@ public class Main {
 //    String command = ".tables";
 //    String command = "SELECT COUNT(*) FROM apples";
 
-    byte[] fileBytes = Utils.readDbFile(databaseFilePath);
+    RandomAccessFile dbFile = Utils.readDbFile(databaseFilePath);
 
     // dot commands
     switch (command) {
       case ".dbinfo" -> {  // print out page size and number of tables
         // get page size
-        DotCommandHandler.dotDbInfoHandler(fileBytes);
+        DotCommandHandler.dotDbInfoHandler(dbFile);
       }
 
       case ".tables" -> {  // get names of tables
-        DotCommandHandler.dotTablesHandler(fileBytes);
+        DotCommandHandler.dotTablesHandler(dbFile);
       }
     }
 
     // query
     if (Utils.isSqlQuery(command)) {
-      QueryResult<?> result = QueryHandler.handle(fileBytes, command);
+      QueryResult<?> result = QueryHandler.handle(dbFile, command);
       if (result != null) {
         for (Object ele : result) {
           System.out.println(ele.toString());
