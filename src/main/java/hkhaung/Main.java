@@ -1,8 +1,11 @@
 package hkhaung;
 
 
+import java.io.IOException;
+
+
 public class Main {
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
     if (args.length < 2) {
       System.out.println("Missing <database path> and <command>");
       return;
@@ -15,27 +18,28 @@ public class Main {
 //    String command = ".tables";
 //    String command = "SELECT COUNT(*) FROM apples";
 
+    byte[] fileBytes = Utils.readDbFile(databaseFilePath);
+
     // dot commands
     switch (command) {
       case ".dbinfo" -> {  // print out page size and number of tables
         // get page size
-        Handlers.dotDbInfoHandler(databaseFilePath);
+        DotCommandHandler.dotDbInfoHandler(fileBytes);
       }
 
       case ".tables" -> {  // get names of tables
-        Handlers.dotTablesHandler(databaseFilePath);
+        DotCommandHandler.dotTablesHandler(fileBytes);
       }
     }
 
     // query
-    // TODO: is hardcoded for now
     if (Utils.isSqlQuery(command)) {
-      String[] query = command.split(" ");
-      String type = query[0];
-      String col = query[1];
-      String table = query[query.length - 1];
-      int numRows = Handlers.queryHandler(databaseFilePath, table);
-      System.out.println(numRows);
+      QueryResult<?> result = QueryHandler.handle(fileBytes, command);
+      if (result != null) {
+        for (Object ele : result) {
+          System.out.println(ele.toString());
+        }
+      }
     }
   }
 }

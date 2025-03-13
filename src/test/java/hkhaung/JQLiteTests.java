@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 
 
@@ -31,21 +32,21 @@ public class JQLiteTests {
     }
 
     @Test
-    void testDbInfo() {
+    void testDbInfo() throws IOException {
         Main.main(new String[]{DBFILE, ".dbinfo"});
         String expectedOutput = "database page size: 4096" + System.lineSeparator() + "number of tables: 3" + System.lineSeparator();
         assertEquals(expectedOutput, outputStream.toString());
     }
 
     @Test
-    void testNamesTables() {
+    void testNamesTables() throws IOException {
         Main.main(new String[]{DBFILE, ".tables"});
         String expectedOutput = "apples oranges" + System.lineSeparator();
         assertEquals(expectedOutput, outputStream.toString());
     }
 
     @Test
-    void testCountRowsQuery() {
+    void testCountRowsQuery() throws IOException {
         Main.main(new String[]{DBFILE, "SELECT COUNT(*) FROM apples"});
         String expectedOutput = "4" + System.lineSeparator();
         assertEquals(expectedOutput, outputStream.toString());

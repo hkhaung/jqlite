@@ -1,10 +1,21 @@
 package hkhaung;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Utils {
+    public static byte[] readDbFile(String databaseFilePath) throws IOException {
+        try {
+            return Files.readAllBytes(Paths.get(databaseFilePath));
+        } catch (IOException e) {
+            throw new IOException("Error reading file: " + e.getMessage());
+        }
+    }
+
     /* Returns an integer value of given bytes arr */
     public static int convertByteToInt(byte[] bytes) {
         if (bytes == null) {
