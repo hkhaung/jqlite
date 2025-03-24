@@ -6,7 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 public class Utils {
     static final byte interiorIndexPage = 0x02;
@@ -46,6 +45,31 @@ public class Utils {
         } else if (bTreePageType == leafTablePage) {
             return numCells;
         }
+
+        return -1;
+    }
+
+    public static int getNumRows(RandomAccessFile dbFile, int pageSize, int pageNum) throws IOException {
+        // get all cells by looking at cell pointer arr of sqlite_schema page
+        // read each cell
+        int start = (pageNum - 1) * pageSize;
+        dbFile.seek(start);
+        if (pageNum == 1) {
+            dbFile.skipBytes(100);  // skip database header
+        }
+
+        // read b tree page header (8 bytes)
+        byte bTreePageType = dbFile.readByte();
+        dbFile.skipBytes(2);
+        int numCells = Short.toUnsignedInt(dbFile.readShort());
+
+        if (bTreePageType == interiorTablePage) {
+            // TODO
+        } else if (bTreePageType == leafTablePage) {
+            return numCells;
+        }
+
+        return -1;
     }
 
     public static String getTableNames(RandomAccessFile dbFile, int pageSize, int pageNum) throws IOException {
@@ -72,61 +96,112 @@ public class Utils {
             }
 
             StringBuilder tableNames = new StringBuilder();
-            for (short offset : cellPointerArr) {
-                dbFile.seek(start + offset);
+            for (int i = 0; i < numCells; i++) {
+                short cellPointer = cellPointerArr[i];
+                dbFile.seek(cellPointer);
 
-                int recordSize = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
-                int rowId = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
+                int recordSize = VarintDecoder.decodeVarint(dbFile);
+                int rowId = VarintDecoder.decodeVarint(dbFile);
+                int recordHeaderSize = VarintDecoder.decodeVarint(dbFile);
 
-//                int recordHeaderSize = Utils.convertByteToInt(new byte[]{fileBytes[offset++]});
-//                int recordContentIndex = offset + recordHeaderSize - 1;
-//                byte[] serialTypes = Arrays.copyOfRange(fileBytes, offset, recordContentIndex);
-//
-//                List<Integer> varints = VarintDecoder.decodeAllVarints(serialTypes);
-//                String prev = null;
-//                for (int varint : varints) {
-//                    int contentSize = Utils.getContentSizeBySerialType(varint);
-//                    byte[] contentBytes = Arrays.copyOfRange(fileBytes, recordContentIndex, recordContentIndex + contentSize);
-//                    recordContentIndex += contentSize;
-//                    String content = Utils.interpretAsString(contentBytes);
-//                    if (Objects.equals(prev, "table") && !Objects.equals(content, "sqlite_sequence") && content != null) {
-//                        tableNames.append(content);
-//                        tableNames.append(" ");
-//                    }
-//                    prev = content;
-//                }
+                long stop = dbFile.getFilePointer() + (recordHeaderSize - 1);
+                List<Integer> varints = new ArrayList<>();
+                while (dbFile.getFilePointer() < stop) {
+                    int varint = VarintDecoder.decodeVarint(dbFile);
+                    varints.add(varint);
+                }
+
+                String prevContentValue = null;
+                for (int varint: varints) {
+                    int contentSize = Utils.getContentSizeBySerialType(varint);
+                    byte[] contentBytes = new byte[contentSize];
+                    int bytesRead = dbFile.read(contentBytes);
+                    if (bytesRead == -1) {
+                        throw new IOException("End of file reached.");
+                    }
+
+                    String contentValue = interpretAsString(contentBytes);
+                    if ("table".equals(prevContentValue) && !"sqlite_sequence".equals(contentValue)) {
+                        tableNames.append(contentValue);
+                        tableNames.append(" ");
+                        break;
+                    }
+                    prevContentValue = contentValue;
+
+                }
             }
             return tableNames.toString().trim();
         }
+
+
+        throw new IOException("getTableNames error");
     }
 
-    /* Returns an integer value of given bytes arr */
-    public static int convertByteToInt(byte[] bytes) {
-        if (bytes == null) {
-            throw new IllegalArgumentException("bytes arg missing");
-        }
-        if (bytes.length == 1) {
-            return Byte.toUnsignedInt(bytes[0]);
+    public static int getTableRootPage(RandomAccessFile dbFile, int pageSize, int pageNum, String tableName) throws IOException {
+        // get all cells by looking at cell pointer arr of sqlite_schema page
+        // read each cell
+        int start = (pageNum - 1) * pageSize;
+        dbFile.seek(start);
+        if (pageNum == 1) {
+            dbFile.skipBytes(100);  // skip database header
         }
 
-        short signed = ByteBuffer.wrap(bytes).getShort();
-        return Short.toUnsignedInt(signed);
-    }
+        // read b tree page header (8 bytes)
+        byte bTreePageType = dbFile.readByte();
+        dbFile.skipBytes(2);
+        int numCells = Short.toUnsignedInt(dbFile.readShort());
+        dbFile.skipBytes(3);
 
-    /* Given a file (.db) in bytes, returns the cell pointer array from
-    * sqlite_schema page  */
-    public static List<Integer> getCellPointerArrSqliteSchema(byte[] fileBytes, int cellPointerArrIndex) {
-        cellPointerArrIndex += 8;  // skip the b-tree page header
-        List<Integer> cellPointerArr = new ArrayList<>();
-        for (int i = cellPointerArrIndex; i < fileBytes.length - 1; i += 2) {
-            if (fileBytes[i] == 0 && fileBytes[i + 1] == 0) {
-                break;
+        if (bTreePageType == interiorTablePage) {
+            // TODO
+        } else if (bTreePageType == leafTablePage) {
+            short[] cellPointerArr = new short[numCells];
+            for (int i = 0; i < numCells; i++) {
+                cellPointerArr[i] = dbFile.readShort();
             }
-            int offset = Utils.convertByteToInt(new byte[]{fileBytes[i], fileBytes[i + 1]});
-            cellPointerArr.add(offset);
+
+            for (int i = 0; i < numCells; i++) {
+                short cellPointer = cellPointerArr[i];
+                dbFile.seek(cellPointer);
+
+                int recordSize = VarintDecoder.decodeVarint(dbFile);
+                int rowId = VarintDecoder.decodeVarint(dbFile);
+                int recordHeaderSize = VarintDecoder.decodeVarint(dbFile);
+
+                long stop = dbFile.getFilePointer() + (recordHeaderSize - 1);
+                List<Integer> varints = new ArrayList<>();
+                while (dbFile.getFilePointer() < stop) {
+                    int varint = VarintDecoder.decodeVarint(dbFile);
+                    varints.add(varint);
+                }
+
+                List<byte[]> content = new ArrayList<>();
+                for (int varint: varints) {
+                    int contentSize = Utils.getContentSizeBySerialType(varint);
+                    byte[] contentBytes = new byte[contentSize];
+                    int bytesRead = dbFile.read(contentBytes);
+                    if (bytesRead == -1) {
+                        throw new IOException("End of file reached.");
+                    }
+                    content.add(contentBytes);
+                }
+
+                if (content.size() > 2) {
+                    String currentTableName = new String(content.get(2));
+                    if (currentTableName.equals(tableName)) {
+                        byte[] rootPageNumber = content.get(3);
+                        return byteArrayToInt(rootPageNumber);
+                    }
+                }
+
+            }
+            return -1;
         }
-        return cellPointerArr;
+
+
+        throw new IOException("getTableNames error");
     }
+
 
     /* get content size for serial type of record */
     public static int getContentSizeBySerialType(int num) {
@@ -160,6 +235,17 @@ public class Utils {
         }
     }
 
+    public static int byteArrayToInt(byte[] bytes) {
+        if (bytes.length > 4) {
+            throw new IllegalArgumentException("Byte array length > 4");
+        }
+
+        byte[] paddedBytes = new byte[4];
+        System.arraycopy(bytes, 0, paddedBytes, 4 - bytes.length, bytes.length);
+        ByteBuffer buffer = ByteBuffer.wrap(paddedBytes);
+        return buffer.getInt();
+    }
+
     public static boolean isSqlQuery(String input) {
         if (input == null || input.trim().isEmpty()) {
             return false;
@@ -173,12 +259,5 @@ public class Utils {
                 command.startsWith("UPDATE") || command.startsWith("DELETE") ||
                 command.startsWith("CREATE") || command.startsWith("DROP") ||
                 command.startsWith("ALTER");
-    }
-
-    /* calculate page offset given pageNum
-    * pageNum is rootpage */
-    public static int determinePageOffset(int pageNum) {
-        int pageSize = 4096;
-        return (pageNum - 1) * pageSize;
     }
 }
