@@ -57,4 +57,11 @@ public class JQLiteTests {
         expectedOutput = "6" + System.lineSeparator();
         assertEquals(expectedOutput, outputStream.toString());
     }
+
+    @Test
+    void testSingleColValsQuery() throws IOException {
+        Main.main(new String[]{DBFILE, "SELECT name FROM apples"});
+        String expectedOutput = "Granny Smith\nFuji\nHoneycrisp\nGolden Delicious" + System.lineSeparator();
+        assertEquals(expectedOutput, outputStream.toString());
+    }
 }

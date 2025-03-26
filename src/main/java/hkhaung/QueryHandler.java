@@ -43,6 +43,8 @@ public class QueryHandler {
         if (cols.toLowerCase().contains("count(*)")) {
             int count = Utils.getNumRows(dbFile, pageSize, tableRootPage);
             return new QueryResult<>(List.of(count), true, null, 1);
+        } else {  // for queries with actual col names ex: SELECT name FROM table
+            Utils.getColVals(dbFile, pageSize, tableRootPage, tableName, cols);
         }
         return null;
     }
